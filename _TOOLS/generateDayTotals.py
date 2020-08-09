@@ -7,6 +7,8 @@
 ## 1) it will use default parameters if input parameters are not specified
 ## 2) highly suggested to use the generateInputFiles.sh script to generate the inputFilesList.
 ## 3) default input data folder used is ../_DATA/ while the output folder is ./_Output/
+##
+## ver 1.0.1 added new Hour chunks to the list, refined the time stamping of data chunks to accommodate those starting or ending with hour-fractions (e.g. 0900-1236, 1236-1408, etc.)
 
 import json
 import matplotlib.pylab as plt
@@ -27,8 +29,11 @@ sFileExt = '-counts.csv'; #file extension
 
 #create a chronologically ordered list of filenames first
 sMainStem = 'EDSA-STARMALL_20200423_';
-lTimeDuration = ['0700-0900','0900-1100','1100-1300','1300-1500','1500-1700','0700-1200','1200-1700'];
-lChunkIdx = np.arange(0,61);
+lTimeDuration = ['0700-0900', '0700-1408','0700-1436','0900-1000',\
+	'1000-1100','0900-1100','1000-1200','1100-1300','1200-1400','1300-1500',\
+	'1400-1600','1408-1700','1500-1700','1600-1800','0700-1200','1200-1700',\
+	'1436-1700','1700-1800'];
+lChunkIdx = np.arange(0,61);8
 
 
 def convToRealTime(dataset,startTime,Ts):
@@ -39,6 +44,11 @@ def convToRealTime(dataset,startTime,Ts):
 	nHours = 0;
 	
 	bFlag = False;
+	
+	#split the start time to hour and minutes first and initialize variables correspondingly
+	nMinutes =  ((startTime - np.floor(startTime))*60).astype('int32'); 
+	startTime = np.floor(startTime).astype('int32');
+	
 	for ind in dataset.index:
 		actualTime.append(str(startTime + nHours) + ':' + str(nMinutes) + ':' + str(np.floor(nSeconds).astype('int32')));
 		nSeconds += Ts;
@@ -95,7 +105,14 @@ def processDataFolder(fFullPathName,sMainStem):
 		if (len(datasetChunk.index) == 0):
 			continue; #move on to the next major time chunk, i.e. 0900-1100 etc.
 		startHour = int(re.search('^([0-9]{2})',i).group(1));
+		startHourMins = int(re.search('^[0-9]{2}([0-9]{2})',i).group(1)); #add fraction-of-an-hour information, e.g. 36 mins from 1436H 
+		
 		endHour = int(re.search('-([0-9]{2}).*$',i).group(1));
+		endHourMins = int(re.search('^[0-9]{2}([0-9]{2})',i).group(1));
+		
+		startHour = startHour + float(startHourMins)/60;
+		endHour = endHour + float(endHourMins)/60;
+		
 		nPerHour = len(datasetChunk.index)/(endHour - startHour); # num samples per hour
 		Ts = 60*60/nPerHour # sampling period (in secs / sample)
 		datasetChunk = convToRealTime(datasetChunk,startHour,Ts);
